@@ -5,6 +5,7 @@ from datetime import datetime
 app = Flask(__name__)
 api = Api(app)
 
+# TODO - Better error messages
 kValidationErrorMessage = "Incorrect parameters."
 kValidationSuccessMessage = "Success"
 
@@ -44,7 +45,8 @@ class MainApi1Month(Resource):
             return kValidationErrorMessage
         month = AttemptCastDigit(request.args.get("month"))
         if month <= 0 or month > 12:
-            return kValidationSuccessMessage
+            return kValidationErrorMessage
+        return kValidationSuccessMessages
 
 api.add_resource(MainApi1Week, '/main/api1/week')
 api.add_resource(MainApi1Month, '/main/api1/month')
