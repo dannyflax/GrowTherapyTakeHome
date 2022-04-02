@@ -1,10 +1,16 @@
 from flask import Flask, request
 from flask_restful import Resource, Api
 from datetime import datetime, timedelta
+from enum import Enum
 import requests
 
 app = Flask(__name__)
 api = Api(app)
+
+class JsonNodeType(Enum):
+    DICT = 1
+    LIST = 2
+    UNKNOWN = 3
 
 # Don't count leap years for now...
 kDaysPerMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
@@ -20,6 +26,75 @@ kWikipediaBase = "https://wikimedia.org/api/rest_v1/metrics/pageviews"
 kRequestContentHeaders = {
     'user-agent' : 'GrowTherapy (https://growtherapy.com/)'
 }
+
+kFormatViewsNode = {
+                      "object_type" : "dict",
+                      "required_keys" : ["project", "article", "granularity", "timestamp", "access", "agent", "views"],
+                      "key_values" : {
+                        "project" : {"object_type" : "string"}, 
+                        "article" : {"object_type" : "string"}, 
+                        "granularity" : {"object_type" : "string"}, 
+                        "timestamp" : {"object_type" : "string"}, 
+                        "access" : {"object_type" : "string"}, 
+                        "agent" : {"object_type" : "string"}, 
+                        "views" : {"object_type" : "int"}
+                      }
+                    }
+
+kViewsResponseFormat = {
+  "object_type" : "dict",
+  "required_keys" : ["items"],
+  "key_values" : {
+     "items" : {
+                "object_type" : "array",
+                "valid_types" : [kFormatViewsNode]
+                }
+  }
+}
+
+def ValidateNode(Node, FormatNode):
+    object_type = FormatNode["object_type"]
+    if object_type is "string":
+        return isinstance(Node, str)
+    if object_type is "int":
+        return isinstance(Node, int)
+    if object_type is "array":
+        if not isinstance(Node, list):
+            return False
+        if "required_values" in FormatNode:
+            required_values = FormatNode["required_values"]
+            if len(required_values) > len(Node):
+                return False
+            for x in range(0, len(required_values)):
+                if not ValidateNode(Node[x], required_values[x]):
+                    return False
+        if "valid_types" in FormatNode:
+            valid_types = FormatNode["valid_types"]
+            for value in Node:
+                value_valid = False
+                for valid_type in valid_types:
+                    if ValidateNode(value, valid_type):
+                        value_valid = True
+                        break
+                if not value_valid:
+                    return False
+        return True
+    if object_type is "dict":
+        if not isinstance(Node, dict):
+            return False
+        if "required_keys" in FormatNode:
+            required_keys = FormatNode["required_keys"]
+            for key in required_keys:
+                if not key in Node:
+                    return False
+            if "key_values" in FormatNode:
+                key_values = FormatNode["key_values"]
+                for key in Node:
+                    if key in key_values:
+                        if not ValidateNode(Node[key], key_values[key]):
+                            return False
+            return True
+            
 
 def ValidateArgsNonEmpty(ArgKeys, Args):
     for key in ArgKeys:
@@ -136,6 +211,10 @@ def MaxDayFromCountsResponse(ViewCountsResponse):
         '%Y%m%d%M'
     )
 
+class Tester(Resource):
+    def get(self):
+        return [ValidateNode(kNode1, kFormat), ValidateNode(kNode2, kFormat)]
+
 class MainApi1Week(Resource):
     def get(self):
         paramSetup = {
@@ -231,6 +310,7 @@ api.add_resource(MainApi1Month, '/main/api1/month')
 api.add_resource(MainApi2Week, '/main/api2/week')
 api.add_resource(MainApi2Month, '/main/api2/month')
 api.add_resource(MainApi3, '/main/api3')
+api.add_resource(Tester, '/main/tester')
 
 if __name__ == '__main__':
     app.run() 
