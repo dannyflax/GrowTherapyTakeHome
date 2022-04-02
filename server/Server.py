@@ -124,6 +124,18 @@ def SumViewCountsReponse(ViewCountsResponse):
         sum = sum + item["views"]
     return sum
 
+def MaxDayFromCountsResponse(ViewCountsResponse):
+    max = 0
+    maxDate = None
+    for item in ViewCountsResponse["items"]:
+        if item["views"] > max:
+            max = item["views"]
+            maxDate = item["timestamp"]
+    return datetime.strptime(
+        maxDate, 
+        '%Y%m%d%M'
+    )
+
 class MainApi1Week(Resource):
     def get(self):
         paramSetup = {
@@ -186,7 +198,7 @@ class MainApi2Month(Resource):
             return kValidationErrorMessage
         startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
         articleName = paramsDict["articleName"]
-        endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1])
+        endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1] - 1)
         response = ExecuteQuery(
             "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
         )
@@ -197,12 +209,23 @@ class MainApi2Month(Resource):
 class MainApi3(Resource):
     def get(self):
         paramSetup = {
+            "month" : "Month",
+            "year" : "Year",
             "articleName" : "String"
         }
         paramsDict = ValidateParams(paramSetup, request.args)
         if paramsDict is None:
             return kValidationErrorMessage
-        return kValidationSuccessMessage
+        startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
+        articleName = paramsDict["articleName"]
+        endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1] - 1)
+        response = ExecuteQuery(
+            "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
+        )
+        if not ValidateResponse(response):
+            return kValidationErrorMessage
+        return response.json()
+        # return str(MaxDayFromCountsResponse(response.json()))
 
 api.add_resource(MainApi1Week, '/main/api1/week')
 api.add_resource(MainApi1Month, '/main/api1/month')
