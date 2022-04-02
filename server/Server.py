@@ -78,13 +78,9 @@ def ExecuteQuery(query):
 def CollectResponsesFromQueries(Queries):
     results = []
     for query in Queries:
-        print(query)
         response = ExecuteQuery(query)
         if ValidateResponse(response):
-            print(response)
             results.append(response.json())
-        else:
-            print(response.status_code)
     return results
 
 def PythonDateToWikiDateString(PythonDate):
@@ -95,6 +91,26 @@ def ComputeDatesListFromStartDate(StartDate, AdditionalDays):
     for i in range(0, AdditionalDays + 1):
         dates.append(PythonDateToWikiDateString(StartDate + timedelta(days=i)))
     return dates
+
+def SumViewsFromDateResponses(DateResponses):
+    viewsMap = {}
+    for dateResponse in DateResponses:
+        for articleData in dateResponse["items"][0]["articles"]:
+            article = articleData["article"]
+            if not article in viewsMap:
+                viewsMap[article] = 0
+            viewsMap[article] = viewsMap[article] + int(articleData["views"])
+    return viewsMap
+
+def SortedResponseFromViewSums(ViewSums):
+    sorted_keys = sorted(ViewSums, key=ViewSums.get, reverse=True)
+    results = []
+    for key in sorted_keys:
+        results.append({
+            "article" : key,
+            "views" : ViewSums[key]
+        })
+    return results
 
 class MainApi1Week(Resource):
     def get(self):
@@ -107,7 +123,8 @@ class MainApi1Week(Resource):
         dateStrings = ComputeDatesListFromStartDate(paramsDict["startDate"], 7)
         queries = map(lambda dateString: "/top/en.wikipedia/all-access/" + dateString, dateStrings)
         responses = CollectResponsesFromQueries(queries)
-        return responses
+        view_sums = SumViewsFromDateResponses(responses)
+        return SortedResponseFromViewSums(view_sums)
 
 class MainApi1Month(Resource):
     def get(self):
@@ -129,7 +146,6 @@ class MainApi2Week(Resource):
         paramsDict = ValidateParams(paramSetup, request.args)
         if paramsDict is None:
             return kValidationErrorMessage
-        print(paramsDict)
         return kValidationSuccessMessage
 
 class MainApi2Month(Resource):
@@ -142,7 +158,6 @@ class MainApi2Month(Resource):
         paramsDict = ValidateParams(paramSetup, request.args)
         if paramsDict is None:
             return kValidationErrorMessage
-        print(paramsDict)
         return kValidationSuccessMessage
 
 class MainApi3(Resource):
