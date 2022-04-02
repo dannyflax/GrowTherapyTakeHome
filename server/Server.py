@@ -6,6 +6,9 @@ import requests
 app = Flask(__name__)
 api = Api(app)
 
+# Don't count leap years for now...
+kDaysPerMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
 # TODO - Better error messages
 kValidationErrorMessage = "Incorrect parameters."
 kValidationSuccessMessage = "Success"
@@ -135,7 +138,13 @@ class MainApi1Month(Resource):
         paramsDict = ValidateParams(paramSetup, request.args)
         if paramsDict is None:
             return kValidationErrorMessage
-        return kValidationSuccessMessage
+        startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
+        daysNumber = kDaysPerMonth[paramsDict["month"] - 1]
+        dateStrings = ComputeDatesListFromStartDate(startDate, daysNumber)
+        queries = map(lambda dateString: "/top/en.wikipedia/all-access/" + dateString, dateStrings)
+        responses = CollectResponsesFromQueries(queries)
+        view_sums = SumViewsFromDateResponses(responses)
+        return SortedResponseFromViewSums(view_sums)
 
 class MainApi2Week(Resource):
     def get(self):
