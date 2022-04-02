@@ -263,6 +263,8 @@ class MainApi2Week(Resource):
         )
         if not ValidateResponse(response):
             return kValidationErrorMessage
+        if not ValidateNode(response.json(), kViewsResponseFormat):
+            return kValidationErrorMessage
         return SumViewCountsReponse(response.json())
 
 class MainApi2Month(Resource):
@@ -283,6 +285,8 @@ class MainApi2Month(Resource):
         )
         if not ValidateResponse(response):
             return kValidationErrorMessage
+        if not ValidateNode(response.json(), kViewsResponseFormat):
+            return kValidationErrorMessage
         return SumViewCountsReponse(response.json())
 
 class MainApi3(Resource):
@@ -302,6 +306,8 @@ class MainApi3(Resource):
             "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
         )
         if not ValidateResponse(response):
+            return kValidationErrorMessage
+        if not ValidateNode(response.json(), kViewsResponseFormat):
             return kValidationErrorMessage
         return str(MaxDayFromCountsResponse(response.json()))
 
