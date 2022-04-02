@@ -89,6 +89,9 @@ def CollectResponsesFromQueries(Queries):
 def PythonDateToWikiDateString(PythonDate):
     return PythonDate.strftime("%Y/%m/%d")
 
+def PythonDateToWikiDateStringApi2(PythonDate):
+    return PythonDate.strftime("%Y%m%d")
+
 def ComputeDatesListFromStartDate(StartDate, AdditionalDays):
     dates = []
     for i in range(0, AdditionalDays + 1):
@@ -114,6 +117,12 @@ def SortedResponseFromViewSums(ViewSums):
             "views" : ViewSums[key]
         })
     return results
+
+def SumViewCountsReponse(ViewCountsResponse):
+    sum = 0
+    for item in ViewCountsResponse["items"]:
+        sum = sum + item["views"]
+    return sum
 
 class MainApi1Week(Resource):
     def get(self):
@@ -155,7 +164,15 @@ class MainApi2Week(Resource):
         paramsDict = ValidateParams(paramSetup, request.args)
         if paramsDict is None:
             return kValidationErrorMessage
-        return kValidationSuccessMessage
+        startDate = paramsDict["startDate"]
+        articleName = paramsDict["articleName"]
+        endDate = startDate + timedelta(days=6)
+        response = ExecuteQuery(
+            "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
+        )
+        if not ValidateResponse(response):
+            return kValidationErrorMessage
+        return SumViewCountsReponse(response.json())
 
 class MainApi2Month(Resource):
     def get(self):
@@ -167,7 +184,15 @@ class MainApi2Month(Resource):
         paramsDict = ValidateParams(paramSetup, request.args)
         if paramsDict is None:
             return kValidationErrorMessage
-        return kValidationSuccessMessage
+        startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
+        articleName = paramsDict["articleName"]
+        endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1])
+        response = ExecuteQuery(
+            "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
+        )
+        if not ValidateResponse(response):
+            return kValidationErrorMessage
+        return SumViewCountsReponse(response.json())
 
 class MainApi3(Resource):
     def get(self):
