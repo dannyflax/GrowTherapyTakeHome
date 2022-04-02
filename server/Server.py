@@ -224,8 +224,7 @@ class MainApi3(Resource):
         )
         if not ValidateResponse(response):
             return kValidationErrorMessage
-        return response.json()
-        # return str(MaxDayFromCountsResponse(response.json()))
+        return str(MaxDayFromCountsResponse(response.json()))
 
 api.add_resource(MainApi1Week, '/main/api1/week')
 api.add_resource(MainApi1Month, '/main/api1/month')
