@@ -1,6 +1,7 @@
 from flask import Flask, request
 from flask_restful import Resource, Api
-from datetime import datetime
+from datetime import datetime, timedelta
+import requests
 
 app = Flask(__name__)
 api = Api(app)
@@ -8,6 +9,14 @@ api = Api(app)
 # TODO - Better error messages
 kValidationErrorMessage = "Incorrect parameters."
 kValidationSuccessMessage = "Success"
+kApiErrorMessage = "Failed to access Wikipedia API or failed to parse response."
+
+kWikipediaBase = "https://wikimedia.org/api/rest_v1/metrics/pageviews"
+
+# Without a user agent, Wikipedia will block our requests.
+kRequestContentHeaders = {
+    'user-agent' : 'GrowTherapy (https://growtherapy.com/)'
+}
 
 def ValidateArgsNonEmpty(ArgKeys, Args):
     for key in ArgKeys:
@@ -54,6 +63,39 @@ def ValidateParams(ArgValueMap, Args):
             result[key] = Args.get(key)
     return result
 
+def ValidateResponse(Response):
+    if Response.status_code is 200:
+        try:
+            Response.json()
+            return True
+        except RequestsJSONDecodeError:
+            return False
+    return False
+
+def ExecuteQuery(query):
+    return requests.get(kWikipediaBase + query, headers=kRequestContentHeaders)
+
+def CollectResponsesFromQueries(Queries):
+    results = []
+    for query in Queries:
+        print(query)
+        response = ExecuteQuery(query)
+        if ValidateResponse(response):
+            print(response)
+            results.append(response.json())
+        else:
+            print(response.status_code)
+    return results
+
+def PythonDateToWikiDateString(PythonDate):
+    return PythonDate.strftime("%Y/%m/%d")
+
+def ComputeDatesListFromStartDate(StartDate, AdditionalDays):
+    dates = []
+    for i in range(0, AdditionalDays + 1):
+        dates.append(PythonDateToWikiDateString(StartDate + timedelta(days=i)))
+    return dates
+
 class MainApi1Week(Resource):
     def get(self):
         paramSetup = {
@@ -62,7 +104,10 @@ class MainApi1Week(Resource):
         paramsDict = ValidateParams(paramSetup, request.args)
         if paramsDict is None:
             return kValidationErrorMessage
-        return kValidationSuccessMessage
+        dateStrings = ComputeDatesListFromStartDate(paramsDict["startDate"], 7)
+        queries = map(lambda dateString: "/top/en.wikipedia/all-access/" + dateString, dateStrings)
+        responses = CollectResponsesFromQueries(queries)
+        return responses
 
 class MainApi1Month(Resource):
     def get(self):
