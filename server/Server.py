@@ -203,7 +203,22 @@ def WrapSuccessResponse(Response):
 def WrapErrorResponse(Error):
     return {"error" : Error}
 
-# APIs
+# Api1Week - Top Pages By Week
+#
+# Calculates the most viewed pages in a given week.
+#
+# Params:
+#   startDate - The start date for the week. Will count this day and the 6 following.
+#
+# Payload Example: 
+# 
+# [
+#     {'article': 'Main_Page', 'views': 48177160}, 
+#     {'article': 'Special:Search', 'views': 9644296}, 
+#     {'article': 'Bridgerton', 'views': 2735520}, 
+#     {'article': 'Wonder_Woman_1984', 'views': 2107456}
+# ]
+#  
 
 class MainApi1Week(Resource):
     def get(self):
@@ -225,6 +240,24 @@ def Api1Week(Executor, Args):
         return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
     view_sums = SumViewsFromDateResponses(responses)
     return WrapSuccessResponse(SortedResponseFromViewSums(view_sums))
+
+# Api1Month - Top Pages By Month
+#
+# Calculates the most viewed pages in a given calendar month and year. Does not account for leap years.
+#
+# Params:
+#   month - The desired month
+#   year - The desired year
+#
+# Payload Example: 
+# 
+# [
+#     {'article': 'Main_Page', 'views': 48177160}, 
+#     {'article': 'Special:Search', 'views': 9644296}, 
+#     {'article': 'Bridgerton', 'views': 2735520}, 
+#     {'article': 'Wonder_Woman_1984', 'views': 2107456}
+# ]
+#  
 
 class MainApi1Month(Resource):
     def get(self):
@@ -250,6 +283,18 @@ def Api1Month(Executor, Args):
     view_sums = SumViewsFromDateResponses(responses)
     return WrapSuccessResponse(SortedResponseFromViewSums(view_sums))
 
+# Api2Week - View Count by Week
+#
+# Calculates total number of views an article had in a given week.
+#
+# Params:
+#   startDate - The start date for the week. Will count this day and the 6 following.
+#   articleName - The desired article name
+#
+# Payload Example: 
+#
+#   59591621
+#  
 class MainApi2Week(Resource):
     def get(self):
         return Api2Week(WikiRequestsQueryExecutor(), request.args)
@@ -276,6 +321,19 @@ def Api2Week(Executor, Args):
         return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
     return WrapSuccessResponse(SumViewCountsReponse(response.json()))
 
+# Api2Month - View Count by Month
+#
+# Calculates total number of views an article had in a given month and calendar year.
+#
+# Params:
+#   month - The desired month
+#   year - The desired year
+#   articleName - The desired article name
+#
+# Payload Example: 
+#
+#   59591621
+#  
 class MainApi2Month(Resource):
     def get(self):
         return Api2Month(WikiRequestsQueryExecutor(), request.args)
@@ -303,6 +361,19 @@ def Api2Month(Executor, Args):
             return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
         return WrapSuccessResponse(SumViewCountsReponse(response.json()))
 
+# Api3 - Date with most page views
+#
+# Given a month and year, returns the calendar date with the most page views.
+#
+# Params:
+#   month - The desired month
+#   year - The desired year
+#   articleName - The desired article name
+#
+# Payload Example: 
+#
+#   "2021-12-04 00:00:00"
+#  
 class MainApi3(Resource):
     def get(self):
         return Api3(WikiRequestsQueryExecutor(), request.args)
