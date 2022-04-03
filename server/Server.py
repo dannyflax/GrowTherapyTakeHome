@@ -7,11 +7,6 @@ import requests
 app = Flask(__name__)
 api = Api(app)
 
-class JsonNodeType(Enum):
-    DICT = 1
-    LIST = 2
-    UNKNOWN = 3
-
 # Don't count leap years for now...
 kDaysPerMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
