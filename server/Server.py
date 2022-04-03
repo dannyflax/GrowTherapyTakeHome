@@ -275,6 +275,12 @@ def MaxDayFromCountsResponse(ViewCountsResponse):
         '%Y%m%d%M'
     )
 
+def WrapSuccessResponse(Response):
+    return {"payload" : Response}
+
+def WrapErrorResponse(Error):
+    return {"error" : Error}
+
 class MainApi1Week(Resource):
     def get(self):
         paramSetup = {
@@ -288,9 +294,9 @@ class MainApi1Week(Resource):
         responses = CollectResponsesFromQueries(queries)
         validationResult = ValidateNode(responses, kArticlesListResponseFormat)
         if not validationResult[0]:
-            return "Failed to parse response: %s" % validationResult[1]
+            return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
         view_sums = SumViewsFromDateResponses(responses)
-        return SortedResponseFromViewSums(view_sums)
+        return WrapSuccessResponse(SortedResponseFromViewSums(view_sums))
 
 class MainApi1Month(Resource):
     def get(self):
@@ -308,9 +314,9 @@ class MainApi1Month(Resource):
         responses = CollectResponsesFromQueries(queries)
         validationResult = ValidateNode(responses, kArticlesListResponseFormat)
         if not validationResult[0]:
-            return "Failed to parse response: %s" % validationResult[1]
+            return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
         view_sums = SumViewsFromDateResponses(responses)
-        return SortedResponseFromViewSums(view_sums)
+        return WrapSuccessResponse(SortedResponseFromViewSums(view_sums))
 
 class MainApi2Week(Resource):
     def get(self):
@@ -320,7 +326,7 @@ class MainApi2Week(Resource):
         }
         paramsDict = ValidateParams(paramSetup, request.args)
         if paramsDict is None:
-            return kValidationErrorMessage
+            return WrapErrorResponse(kValidationErrorMessage)
         startDate = paramsDict["startDate"]
         articleName = paramsDict["articleName"]
         endDate = startDate + timedelta(days=6)
@@ -328,11 +334,11 @@ class MainApi2Week(Resource):
             "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
         )
         if not ValidateResponse(response):
-            return kValidationErrorMessage
+            return WrapErrorResponse(kValidationErrorMessage)
         validationResult = ValidateNode(response.json(), kViewsResponseFormat)
         if not validationResult[0]:
-            return "Failed to parse response: %s" % validationResult[1]
-        return SumViewCountsReponse(response.json())
+            return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
+        return WrapSuccessResponse(SumViewCountsReponse(response.json()))
 
 class MainApi2Month(Resource):
     def get(self):
@@ -343,7 +349,7 @@ class MainApi2Month(Resource):
         }
         paramsDict = ValidateParams(paramSetup, request.args)
         if paramsDict is None:
-            return kValidationErrorMessage
+            return WrapErrorResponse(kValidationErrorMessage)
         startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
         articleName = paramsDict["articleName"]
         endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1] - 1)
@@ -351,11 +357,11 @@ class MainApi2Month(Resource):
             "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
         )
         if not ValidateResponse(response):
-            return kValidationErrorMessage
+            return WrapErrorResponse(kValidationErrorMessage)
         validationResult = ValidateNode(response.json(), kViewsResponseFormat)
         if not validationResult[0]:
-            return "Failed to parse response: %s" % validationResult[1]
-        return SumViewCountsReponse(response.json())
+            return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
+        return WrapSuccessResponse(SumViewCountsReponse(response.json()))
 
 class MainApi3(Resource):
     def get(self):
@@ -366,7 +372,7 @@ class MainApi3(Resource):
         }
         paramsDict = ValidateParams(paramSetup, request.args)
         if paramsDict is None:
-            return kValidationErrorMessage
+            return WrapErrorResponse(kValidationErrorMessage)
         startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
         articleName = paramsDict["articleName"]
         endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1] - 1)
@@ -374,11 +380,11 @@ class MainApi3(Resource):
             "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
         )
         if not ValidateResponse(response):
-            return kValidationErrorMessage
+            return WrapErrorResponse(kValidationErrorMessage)
         validationResult = ValidateNode(response.json(), kViewsResponseFormat)
         if not validationResult[0]:
-            return "Failed to parse response: %s" % validationResult[1]
-        return str(MaxDayFromCountsResponse(response.json()))
+            return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
+        return WrapSuccessResponse(str(MaxDayFromCountsResponse(response.json())))
 
 api.add_resource(MainApi1Week, '/main/api1/week')
 api.add_resource(MainApi1Month, '/main/api1/month')
