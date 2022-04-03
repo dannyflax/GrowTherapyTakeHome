@@ -37,3 +37,11 @@ cd tests
 python -m unittest TestServerValidation
 python -m unittest TestServer
 ```
+
+## Future Improvements
+
+This repo has the following todo's that could help in the future:
+1. Add a good .gitignore - I'm aware there are some compiled python files in here, I just didn't have the time to properly get rid of them.
+2. Unit testing non-critical methods within Server.py.
+3. Create a client to demonstrate the working API.
+4. Adhere better to python naming standards - My python is a bit rusty, so I might have botched the naming conventions here.
