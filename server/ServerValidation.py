@@ -202,7 +202,7 @@ def ValidateNode(Node, FormatNode):
         yearValue = AttemptCastDigit(Node)
         if not yearValue[0]:
             return (False, "Cannot parse string as year: %s" % yearValue[1])
-        if yearValue <= 0:
+        if yearValue[1] <= 0:
             return (False, "Year string must be greater than 0.")
         return (True, None)
     if object_type is "date_string":

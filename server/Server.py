@@ -85,6 +85,10 @@ kArticlesListResponseFormat = {
     "valid_types" : [kArticlesItemsResponseFormat]
 }
 
+class WikiRequestsQueryExecutor:
+    def execute(self, query):
+        return requests.get(kWikipediaBase + query, headers=kRequestContentHeaders)
+
 def ValidateArgsNonEmpty(ArgKeys, Args):
     for key in ArgKeys:
         if Args.get(key) is None:
@@ -111,12 +115,12 @@ def CastAndValidateParams(Args, ArgValueMap):
             monthValue = ServerValidation.AttemptCastDigit(Args.get(key))
             if monthValue[1] <= 0 or monthValue[1] > 12:
                 return (False, "Failed to cast month string after validation")
-            result[key] = monthValue
+            result[key] = monthValue[1]
         if value["object_type"] is "year_string":
             yearValue = ServerValidation.AttemptCastDigit(Args.get(key))
             if yearValue[1] <= 0:
                 return (False, "Failed to cast year string after validation")
-            result[key] = yearValue
+            result[key] = yearValue[1]
         if value["object_type"] is "date_string":
             dateValue = ServerValidation.AttemptCastDate(Args.get(key))
             if not dateValue[0]:
@@ -135,13 +139,10 @@ def ValidateResponse(Response):
             return False
     return False
 
-def ExecuteQuery(query):
-    return requests.get(kWikipediaBase + query, headers=kRequestContentHeaders)
-
-def CollectResponsesFromQueries(Queries):
+def CollectResponsesFromQueries(Queries, Executor):
     results = []
     for query in Queries:
-        response = ExecuteQuery(query)
+        response = Executor.execute(query)
         if ValidateResponse(response):
             results.append(response.json())
     return results
@@ -202,70 +203,84 @@ def WrapSuccessResponse(Response):
 def WrapErrorResponse(Error):
     return {"error" : Error}
 
+# APIs
+
 class MainApi1Week(Resource):
     def get(self):
-        paramSetup = {
-            "startDate" : ServerValidation.kDateStringObject
-        }
-        paramsResult = CastAndValidateParams(request.args, paramSetup)
-        if not paramsResult[0]:
-            return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
-        paramsDict = paramsResult[1]
-        dateStrings = ComputeDatesListFromStartDate(paramsDict["startDate"], 7)
-        queries = map(lambda dateString: "/top/en.wikipedia/all-access/" + dateString, dateStrings)
-        responses = CollectResponsesFromQueries(queries)
-        validationResult = ServerValidation.ValidateNode(responses, kArticlesListResponseFormat)
-        if not validationResult[0]:
-            return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
-        view_sums = SumViewsFromDateResponses(responses)
-        return WrapSuccessResponse(SortedResponseFromViewSums(view_sums))
+        return Api1Week(WikiRequestsQueryExecutor(), request.args)
+
+def Api1Week(Executor, Args):
+    paramSetup = {
+        "startDate" : ServerValidation.kDateStringObject
+    }
+    paramsResult = CastAndValidateParams(Args, paramSetup)
+    if not paramsResult[0]:
+        return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
+    paramsDict = paramsResult[1]
+    dateStrings = ComputeDatesListFromStartDate(paramsDict["startDate"], 7)
+    queries = map(lambda dateString: "/top/en.wikipedia/all-access/" + dateString, dateStrings)
+    responses = CollectResponsesFromQueries(queries, Executor)
+    validationResult = ServerValidation.ValidateNode(responses, kArticlesListResponseFormat)
+    if not validationResult[0]:
+        return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
+    view_sums = SumViewsFromDateResponses(responses)
+    return WrapSuccessResponse(SortedResponseFromViewSums(view_sums))
 
 class MainApi1Month(Resource):
     def get(self):
-        paramSetup = {
-            "month" : ServerValidation.kMonthStringObject,
-            "year" : ServerValidation.kYearStringObject
-        }
-        paramsResult = CastAndValidateParams(request.args, paramSetup)
-        if not paramsResult[0]:
-            return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
-        paramsDict = paramsResult[1]
-        startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
-        daysNumber = kDaysPerMonth[paramsDict["month"] - 1]
-        dateStrings = ComputeDatesListFromStartDate(startDate, daysNumber)
-        queries = map(lambda dateString: "/top/en.wikipedia/all-access/" + dateString, dateStrings)
-        responses = CollectResponsesFromQueries(queries)
-        validationResult = ServerValidation.ValidateNode(responses, kArticlesListResponseFormat)
-        if not validationResult[0]:
-            return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
-        view_sums = SumViewsFromDateResponses(responses)
-        return WrapSuccessResponse(SortedResponseFromViewSums(view_sums))
+        return Api1Month(WikiRequestsQueryExecutor(), request.args)
+
+def Api1Month(Executor, Args):
+    paramSetup = {
+        "month" : ServerValidation.kMonthStringObject,
+        "year" : ServerValidation.kYearStringObject
+    }
+    paramsResult = CastAndValidateParams(Args, paramSetup)
+    if not paramsResult[0]:
+        return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
+    paramsDict = paramsResult[1]
+    startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
+    daysNumber = kDaysPerMonth[paramsDict["month"] - 1]
+    dateStrings = ComputeDatesListFromStartDate(startDate, daysNumber)
+    queries = map(lambda dateString: "/top/en.wikipedia/all-access/" + dateString, dateStrings)
+    responses = CollectResponsesFromQueries(queries, Executor)
+    validationResult = ServerValidation.ValidateNode(responses, kArticlesListResponseFormat)
+    if not validationResult[0]:
+        return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
+    view_sums = SumViewsFromDateResponses(responses)
+    return WrapSuccessResponse(SortedResponseFromViewSums(view_sums))
 
 class MainApi2Week(Resource):
     def get(self):
-        paramSetup = {
-            "startDate" : ServerValidation.kDateStringObject,
-            "articleName" : ServerValidation.kStringObject
-        }
-        paramsResult = CastAndValidateParams(request.args, paramSetup)
-        if not paramsResult[0]:
-            return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
-        paramsDict = paramsResult[1]
-        startDate = paramsDict["startDate"]
-        articleName = paramsDict["articleName"]
-        endDate = startDate + timedelta(days=6)
-        response = ExecuteQuery(
-            "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
-        )
-        if not ValidateResponse(response):
-            return WrapErrorResponse(kApiErrorMessage)
-        validationResult = ServerValidation.ValidateNode(response.json(), kViewsResponseFormat)
-        if not validationResult[0]:
-            return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
-        return WrapSuccessResponse(SumViewCountsReponse(response.json()))
+        return Api2Week(WikiRequestsQueryExecutor(), request.args)
+
+def Api2Week(Executor, Args):
+    paramSetup = {
+        "startDate" : ServerValidation.kDateStringObject,
+        "articleName" : ServerValidation.kStringObject
+    }
+    paramsResult = CastAndValidateParams(Args, paramSetup)
+    if not paramsResult[0]:
+        return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
+    paramsDict = paramsResult[1]
+    startDate = paramsDict["startDate"]
+    articleName = paramsDict["articleName"]
+    endDate = startDate + timedelta(days=6)
+    response = Executor.execute(
+        "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
+    )
+    if not ValidateResponse(response):
+        return WrapErrorResponse(kApiErrorMessage)
+    validationResult = ServerValidation.ValidateNode(response.json(), kViewsResponseFormat)
+    if not validationResult[0]:
+        return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
+    return WrapSuccessResponse(SumViewCountsReponse(response.json()))
 
 class MainApi2Month(Resource):
     def get(self):
+        return Api2Month(WikiRequestsQueryExecutor(), request.args)
+
+def Api2Month(Executor, Args):
         paramSetup = {
             "month" : ServerValidation.kMonthStringObject,
             "year" : ServerValidation.kYearStringObject,
@@ -278,7 +293,7 @@ class MainApi2Month(Resource):
         startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
         articleName = paramsDict["articleName"]
         endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1] - 1)
-        response = ExecuteQuery(
+        response = Executor.execute(
             "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
         )
         if not ValidateResponse(response):
@@ -290,27 +305,30 @@ class MainApi2Month(Resource):
 
 class MainApi3(Resource):
     def get(self):
-        paramSetup = {
-            "month" : ServerValidation.kMonthStringObject,
-            "year" : ServerValidation.kYearStringObject,
-            "articleName" : ServerValidation.kStringObject
-        }
-        paramsResult = CastAndValidateParams(request.args, paramSetup)
-        if not paramsResult[0]:
-            return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
-        paramsDict = paramsResult[1]
-        startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
-        articleName = paramsDict["articleName"]
-        endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1] - 1)
-        response = ExecuteQuery(
-            "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
-        )
-        if not ValidateResponse(response):
-            return WrapErrorResponse(kApiErrorMessage)
-        validationResult = ServerValidation.ValidateNode(response.json(), kViewsResponseFormat)
-        if not validationResult[0]:
-            return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
-        return WrapSuccessResponse(str(MaxDayFromCountsResponse(response.json())))
+        return Api3(WikiRequestsQueryExecutor(), request.args)
+
+def Api3(Executor, Args):
+    paramSetup = {
+        "month" : ServerValidation.kMonthStringObject,
+        "year" : ServerValidation.kYearStringObject,
+        "articleName" : ServerValidation.kStringObject
+    }
+    paramsResult = CastAndValidateParams(request.args, paramSetup)
+    if not paramsResult[0]:
+        return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
+    paramsDict = paramsResult[1]
+    startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
+    articleName = paramsDict["articleName"]
+    endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1] - 1)
+    response = Executor.execute(
+        "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
+    )
+    if not ValidateResponse(response):
+        return WrapErrorResponse(kApiErrorMessage)
+    validationResult = ServerValidation.ValidateNode(response.json(), kViewsResponseFormat)
+    if not validationResult[0]:
+        return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
+    return WrapSuccessResponse(str(MaxDayFromCountsResponse(response.json())))
 
 api.add_resource(MainApi1Week, '/main/api1/week')
 api.add_resource(MainApi1Month, '/main/api1/month')
