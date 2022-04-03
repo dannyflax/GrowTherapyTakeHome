@@ -110,6 +110,22 @@ class TestServerValidation(unittest.TestCase):
 
         self.assertResultAndErrorStart(ValidateNode({"key1" : 123, "key2" : [1, 2, 3], "key5" : "whatever"}, spec), False, None)
         self.assertResultAndErrorStart(ValidateNode({}, spec), False, None)
+
+    def testIntValues(self):
+        spec = {
+           "object_type" : "int"
+        }
+        self.assertResultAndErrorStart(ValidateNode(123, spec), True, None)
+        self.assertResultAndErrorStart(ValidateNode(5.123, spec), False, None)
+        self.assertResultAndErrorStart(ValidateNode({}, spec), False, None)
+
+    def testStringValues(self):
+        spec = {
+           "object_type" : "string"
+        }
+        self.assertResultAndErrorStart(ValidateNode("123", spec), True, None)
+        self.assertResultAndErrorStart(ValidateNode(5.123, spec), False, None)
+        self.assertResultAndErrorStart(ValidateNode({}, spec), False, None)
     
 if __name__ == '__main__':
     unittest.main()
