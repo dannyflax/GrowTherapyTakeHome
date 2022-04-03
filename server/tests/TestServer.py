@@ -16,6 +16,24 @@ kSuccessResponseFormat = {
     "required_keys" : ["payload"]
 }
 
+kMockApi1SuccessPayloadWeek = [
+    {'article': 'Main_Page', 'views': 48177160}, 
+    {'article': 'Special:Search', 'views': 9644296}, 
+    {'article': 'Bridgerton', 'views': 2735520}, 
+    {'article': 'Wonder_Woman_1984', 'views': 2107456}
+]
+
+kMockApi1SuccessPayloadMonth = [
+    {'article': 'Main_Page', 'views': 192708640}, 
+    {'article': 'Special:Search', 'views': 38577184}, 
+    {'article': 'Bridgerton', 'views': 10942080}, 
+    {'article': 'Wonder_Woman_1984', 'views': 8429824}
+]
+
+kMockApi2SuccessPayload = 59591621
+
+kMockApi3SuccessPayload = "2021-12-04 00:00:00"
+
 kMockValidWeeksParams = {
     "startDate" : "5.29.2020",
     "articleName" : "Main_Page"
@@ -147,6 +165,7 @@ class TestServerValidation(unittest.TestCase):
     def testApi1WeekSuccess(self):
         result = Api1Week(MockQueryExecutor(), kMockValidWeeksParams)
         self.assertResultMatchesFormat(result, kSuccessResponseFormat)
+        self.assertEqual(result["payload"], kMockApi1SuccessPayloadWeek)
 
     def testApi1WeekFail(self):
         result = Api1Week(MockQueryExecutor(), kMockInvalidWeeksParams)
@@ -155,6 +174,7 @@ class TestServerValidation(unittest.TestCase):
     def testApi1MonthSuccess(self):
         result = Api1Month(MockQueryExecutor(), kMockValidMonthsParams)
         self.assertResultMatchesFormat(result, kSuccessResponseFormat)
+        self.assertEqual(result["payload"], kMockApi1SuccessPayloadMonth)
 
     def testApi1MonthFail(self):
         result = Api1Month(MockQueryExecutor(), kMockInvalidMonthsParams)
@@ -163,6 +183,7 @@ class TestServerValidation(unittest.TestCase):
     def testApi2WeekSuccess(self):
         result = Api2Week(MockQueryExecutor(), kMockValidWeeksParams)
         self.assertResultMatchesFormat(result, kSuccessResponseFormat)
+        self.assertEqual(result["payload"], kMockApi2SuccessPayload)
 
     def testApi2WeekFail(self):
         result = Api2Week(MockQueryExecutor(), kMockInvalidWeeksParams)
@@ -171,6 +192,7 @@ class TestServerValidation(unittest.TestCase):
     def testApi2MonthSuccess(self):
         result = Api2Month(MockQueryExecutor(), kMockValidMonthsParams)
         self.assertResultMatchesFormat(result, kSuccessResponseFormat)
+        self.assertEqual(result["payload"], kMockApi2SuccessPayload)
 
     def testApi2MonthFail(self):
         result = Api2Month(MockQueryExecutor(), kMockInvalidMonthsParams)
@@ -179,6 +201,7 @@ class TestServerValidation(unittest.TestCase):
     def testApi3Success(self):
         result = Api3(MockQueryExecutor(), kMockValidMonthsParams)
         self.assertResultMatchesFormat(result, kSuccessResponseFormat)
+        self.assertEqual(result["payload"], kMockApi3SuccessPayload)
 
     def testApi3Fail(self):
         result = Api3(MockQueryExecutor(), kMockInvalidMonthsParams)
