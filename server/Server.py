@@ -286,7 +286,7 @@ def Api2Month(Executor, Args):
             "year" : ServerValidation.kYearStringObject,
             "articleName" : ServerValidation.kStringObject
         }
-        paramsResult = CastAndValidateParams(request.args, paramSetup)
+        paramsResult = CastAndValidateParams(Args, paramSetup)
         if not paramsResult[0]:
             return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
         paramsDict = paramsResult[1]
@@ -313,7 +313,7 @@ def Api3(Executor, Args):
         "year" : ServerValidation.kYearStringObject,
         "articleName" : ServerValidation.kStringObject
     }
-    paramsResult = CastAndValidateParams(request.args, paramSetup)
+    paramsResult = CastAndValidateParams(Args, paramSetup)
     if not paramsResult[0]:
         return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
     paramsDict = paramsResult[1]
