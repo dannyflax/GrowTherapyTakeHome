@@ -62,10 +62,10 @@
 #
 #         Example:
 #       
-#         {
-#            "object_type" : "array",
-#            "required_values" : [kStringObject, kIntObject, kDateStringObject] 
-#         }       
+        # {
+        #    "object_type" : "array",
+        #    "required_values" : [kStringObject, kIntObject, kDateStringObject] 
+        # }       
 #
 #         The following list will pass:
 #      
@@ -273,6 +273,6 @@ def ValidateNode(Node, FormatNode):
                         resp = ValidateNode(Node[key], key_values[key])
                         if not resp[0]:
                             return (False, resp[1])
-            return (True, None)
+        return (True, None)
 
             
