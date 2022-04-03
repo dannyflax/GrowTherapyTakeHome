@@ -33,6 +33,7 @@ python3 Server.py
 And unit tests with these commands:
 
 ```
+cd tests
 python -m unittest TestServerValidation
 python -m unittest TestServer
 ```
