@@ -45,3 +45,4 @@ This repo has the following todo's that could help in the future:
 2. Unit testing non-critical methods within Server.py.
 3. Create a client to demonstrate the working API.
 4. Adhere better to python naming standards - My python is a bit rusty, so I might have botched the naming conventions here.
+5. Find a more optimized way to run Api 1 - Currently it makes a ton of sequential calls to the wiki API. This makes the API slow. One way we could optimize this is by parallelizing the calls to the requests API. The GIL won't let us parallelize python code execution, but we could at least parallelize the network I/O processes. We would still be bound by the network controller but this should still get us better performance than today..
