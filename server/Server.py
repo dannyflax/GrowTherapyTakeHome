@@ -10,10 +10,8 @@ api = Api(app)
 # Don't count leap years for now...
 kDaysPerMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
-# TODO - Better error messages
-kValidationErrorMessage = "Incorrect parameters."
 kValidationSuccessMessage = "Success"
-kApiErrorMessage = "Failed to access Wikipedia API or failed to parse response."
+kApiErrorMessage = "Failed to access Wikipedia API or response is in non-json format."
 
 kWikipediaBase = "https://wikimedia.org/api/rest_v1/metrics/pageviews"
 
@@ -22,6 +20,9 @@ kRequestContentHeaders = {
     'user-agent' : 'GrowTherapy (https://growtherapy.com/)'
 }
 
+kMonthStringObject = {"object_type" : "month_string"}
+kDateStringObject = {"object_type" : "date_string"}
+kYearStringObject = {"object_type" : "year_string"}
 kStringObject = {"object_type" : "string"}
 kIntObject = {"object_type" : "int"}
 
@@ -53,10 +54,10 @@ kViewsResponseFormat = {
 kArticleObjectFormat = {
     "object_type" : "dict",
     "required_keys" : ["article", "views"],
-        "key_values" : {
-            "article" : kStringObject,
-            "views" : kIntObject,
-        }
+    "key_values" : {
+        "article" : kStringObject,
+        "views" : kIntObject,
+    }
 }
 
 kArticlesResponseFormat = {
@@ -91,6 +92,31 @@ kArticlesListResponseFormat = {
 
 def ValidateNode(Node, FormatNode):
     object_type = FormatNode["object_type"]
+    if object_type is "month_string":
+        if not isinstance(Node, str):
+            return (False, "Expected string but got %s" % str(Node))
+        monthValue = AttemptCastDigit(Node)
+        if not monthValue[0]:
+            return (False, "Cannot parse string as month: %s" % monthValue[1])
+        if monthValue[1] <= 0 or monthValue[1] > 12:
+            return (False, "Month string must be between 1 and 12.")
+        return (True, None)
+    if object_type is "year_string":
+        if not isinstance(Node, str):
+            return (False, "Expected string but got %s" % str(Node))
+        yearValue = AttemptCastDigit(Node)
+        if not yearValue[0]:
+            return (False, "Cannot parse string as year: %s" % yearValue[1])
+        if yearValue <= 0:
+            return (False, "Year string must be greater than 0.")
+        return (True, None)
+    if object_type is "date_string":
+        if not isinstance(Node, str):
+            return (False, "Expected string but got %s" % str(Node))
+        dateValue = AttemptCastDate(Node)
+        if not dateValue[0]:
+            return (False, dateValue[1])
+        return (True, None)
     if object_type is "string":
         if not isinstance(Node, str):
             return (False, "Expected string but got %s" % str(Node))
@@ -163,42 +189,56 @@ def ValidateArgsNonEmpty(ArgKeys, Args):
 
 def AttemptCastDigit(DigitString):
     if str.isdigit(DigitString):
-        return int(DigitString)
+        return (True, int(DigitString))
     else:
-        return -1
+        return (False, -1)
 
 def AttemptCastDate(DateTime):
     try:
-        return datetime.strptime(
-                    request.args.get("startDate"), 
-                    '%m.%d.%Y'
+        return (
+            True,
+            datetime.strptime(
+                request.args.get("startDate"), 
+                '%m.%d.%Y'
                 )
-    except ValueError:
-        return None
+            )
+    except ValueError as e:
+        return (False, str(e))
 
-def ValidateParams(ArgValueMap, Args):
-    result = {}
+def CreateValidatorFromParams(Params):
+    return {
+        "object_type" : "dict",
+        "required_keys" : list(Params.keys()),
+        "key_values" : Params
+    }
+
+def CastAndValidateParams(Args, ArgValueMap):
+    validator = CreateValidatorFromParams(ArgValueMap)
+    validationResult = ValidateNode(Args, validator)
+    if not validationResult[0]:
+        return (False, validationResult[1])
     if not ValidateArgsNonEmpty(ArgValueMap.keys(), Args):
-        return None
+        return (False, "Required args empty after validation")
+    result = {}
     for key, value in ArgValueMap.items():
-        if value is "Month":
+        if value["object_type"] is "month_string":
             monthValue = AttemptCastDigit(Args.get(key))
-            if monthValue <= 0 or monthValue > 12:
-                return None
+            if monthValue[1] <= 0 or monthValue[1] > 12:
+                return (False, "Failed to cast month string after validation")
             result[key] = monthValue
-        if value is "Year":
+        if value["object_type"] is "year_string":
             yearValue = AttemptCastDigit(Args.get(key))
-            if yearValue <= 0:
-                return None
+            if yearValue[1] <= 0:
+                return (False, "Failed to cast year string after validation")
             result[key] = yearValue
-        if value is "Date":
+        if value["object_type"] is "date_string":
             dateValue = AttemptCastDate(Args.get(key))
-            if dateValue is None:
-                return None
-            result[key] = dateValue
-        if value is "String":
+            if not dateValue[0]:
+                return (False, "Failed to cast date string after validation")
+            result[key] = dateValue[1]
+        if value["object_type"] is "string":
             result[key] = Args.get(key)
-    return result
+    return (True, result)
 
 def ValidateResponse(Response):
     if Response.status_code is 200:
@@ -279,11 +319,12 @@ def WrapErrorResponse(Error):
 class MainApi1Week(Resource):
     def get(self):
         paramSetup = {
-            "startDate" : "Date"
+            "startDate" : kDateStringObject
         }
-        paramsDict = ValidateParams(paramSetup, request.args)
-        if paramsDict is None:
-            return kValidationErrorMessage
+        paramsResult = CastAndValidateParams(request.args, paramSetup)
+        if not paramsResult[0]:
+            return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
+        paramsDict = paramsResult[1]
         dateStrings = ComputeDatesListFromStartDate(paramsDict["startDate"], 7)
         queries = map(lambda dateString: "/top/en.wikipedia/all-access/" + dateString, dateStrings)
         responses = CollectResponsesFromQueries(queries)
@@ -296,12 +337,13 @@ class MainApi1Week(Resource):
 class MainApi1Month(Resource):
     def get(self):
         paramSetup = {
-            "month" : "Month",
-            "year" : "Year"
+            "month" : kMonthStringObject,
+            "year" : kYearStringObject
         }
-        paramsDict = ValidateParams(paramSetup, request.args)
-        if paramsDict is None:
-            return kValidationErrorMessage
+        paramsResult = CastAndValidateParams(request.args, paramSetup)
+        if not paramsResult[0]:
+            return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
+        paramsDict = paramsResult[1]
         startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
         daysNumber = kDaysPerMonth[paramsDict["month"] - 1]
         dateStrings = ComputeDatesListFromStartDate(startDate, daysNumber)
@@ -316,12 +358,13 @@ class MainApi1Month(Resource):
 class MainApi2Week(Resource):
     def get(self):
         paramSetup = {
-            "startDate" : "Date",
-            "articleName" : "String"
+            "startDate" : kDateStringObject,
+            "articleName" : kStringObject
         }
-        paramsDict = ValidateParams(paramSetup, request.args)
-        if paramsDict is None:
-            return WrapErrorResponse(kValidationErrorMessage)
+        paramsResult = CastAndValidateParams(request.args, paramSetup)
+        if not paramsResult[0]:
+            return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
+        paramsDict = paramsResult[1]
         startDate = paramsDict["startDate"]
         articleName = paramsDict["articleName"]
         endDate = startDate + timedelta(days=6)
@@ -329,7 +372,7 @@ class MainApi2Week(Resource):
             "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
         )
         if not ValidateResponse(response):
-            return WrapErrorResponse(kValidationErrorMessage)
+            return WrapErrorResponse(kApiErrorMessage)
         validationResult = ValidateNode(response.json(), kViewsResponseFormat)
         if not validationResult[0]:
             return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
@@ -338,13 +381,14 @@ class MainApi2Week(Resource):
 class MainApi2Month(Resource):
     def get(self):
         paramSetup = {
-            "month" : "Month",
-            "year" : "Year",
-            "articleName" : "String"
+            "month" : kMonthStringObject,
+            "year" : kYearStringObject,
+            "articleName" : kStringObject
         }
-        paramsDict = ValidateParams(paramSetup, request.args)
-        if paramsDict is None:
-            return WrapErrorResponse(kValidationErrorMessage)
+        paramsResult = CastAndValidateParams(request.args, paramSetup)
+        if not paramsResult[0]:
+            return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
+        paramsDict = paramsResult[1]
         startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
         articleName = paramsDict["articleName"]
         endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1] - 1)
@@ -352,7 +396,7 @@ class MainApi2Month(Resource):
             "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
         )
         if not ValidateResponse(response):
-            return WrapErrorResponse(kValidationErrorMessage)
+            return WrapErrorResponse(kApiErrorMessage)
         validationResult = ValidateNode(response.json(), kViewsResponseFormat)
         if not validationResult[0]:
             return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
@@ -361,13 +405,14 @@ class MainApi2Month(Resource):
 class MainApi3(Resource):
     def get(self):
         paramSetup = {
-            "month" : "Month",
-            "year" : "Year",
-            "articleName" : "String"
+            "month" : kMonthStringObject,
+            "year" : kYearStringObject,
+            "articleName" : kStringObject
         }
-        paramsDict = ValidateParams(paramSetup, request.args)
-        if paramsDict is None:
-            return WrapErrorResponse(kValidationErrorMessage)
+        paramsResult = CastAndValidateParams(request.args, paramSetup)
+        if not paramsResult[0]:
+            return WrapErrorResponse("Incorrect Parameters - %s" % paramsResult[1])
+        paramsDict = paramsResult[1]
         startDate = datetime(year=paramsDict["year"], month=paramsDict["month"], day=1)
         articleName = paramsDict["articleName"]
         endDate = startDate + timedelta(days=kDaysPerMonth[paramsDict["month"] - 1] - 1)
@@ -375,7 +420,7 @@ class MainApi3(Resource):
             "/per-article/en.wikipedia.org/all-access/all-agents/%s/daily/%s/%s" % (articleName, PythonDateToWikiDateStringApi2(startDate), PythonDateToWikiDateStringApi2(endDate))
         )
         if not ValidateResponse(response):
-            return WrapErrorResponse(kValidationErrorMessage)
+            return WrapErrorResponse(kApiErrorMessage)
         validationResult = ValidateNode(response.json(), kViewsResponseFormat)
         if not validationResult[0]:
             return WrapErrorResponse("Failed to parse response: %s" % validationResult[1])
