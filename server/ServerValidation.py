@@ -184,6 +184,8 @@ def AttemptCastDate(DateTime):
         return (False, str(e))
 
 def ValidateNode(Node, FormatNode):
+    if not isinstance(FormatNode, dict) or not "object_type" in FormatNode:
+        return (False, "Invalid Spec - Spec must start with a dict with a key 'object_type'.")
     object_type = FormatNode["object_type"]
     if object_type is "month_string":
         if not isinstance(Node, str):
@@ -224,7 +226,7 @@ def ValidateNode(Node, FormatNode):
         if "required_values" in FormatNode:
             required_values = FormatNode["required_values"]
             if not isinstance(required_values, list):
-                return (False, "Incorrect Format: Expected required_values to be a list, but got %s" % str(required_values))
+                return (False, "Invalid Spec - Expected required_values to be a list, but got %s" % str(required_values))
             if len(required_values) > len(Node):
                 return (
                     False, 
@@ -241,7 +243,7 @@ def ValidateNode(Node, FormatNode):
         if "valid_types" in FormatNode:
             valid_types = FormatNode["valid_types"]
             if not isinstance(valid_types, list):
-                return (False, "Incorrect Format: Expected valid_types to be a list, but got %s" % str(valid_types))
+                return (False, "Invalid Spec - Expected valid_types to be a list, but got %s" % str(valid_types))
             for value in Node:
                 value_valid = False
                 for valid_type in valid_types:
@@ -258,14 +260,14 @@ def ValidateNode(Node, FormatNode):
         if "required_keys" in FormatNode:
             required_keys = FormatNode["required_keys"]
             if not isinstance(required_keys, list):
-                return (False, "Incorrect Format: Expected required_keys to be a list, but got %s" % str(required_keys))
+                return (False, "Invalid Spec - Expected required_keys to be a list, but got %s" % str(required_keys))
             for key in required_keys:
                 if not key in Node:
                     return (False, "Required key %s missing from dict %s" % (key, str(Node)))
             if "key_values" in FormatNode:
                 key_values = FormatNode["key_values"]
                 if not isinstance(key_values, dict):
-                    return (False, "Incorrect Format: Expected key_values to be a dict, but got %s" % str(dict))
+                    return (False, "Invalid Spec - Expected key_values to be a dict, but got %s" % str(dict))
                 for key in Node:
                     if key in key_values:
                         resp = ValidateNode(Node[key], key_values[key])
