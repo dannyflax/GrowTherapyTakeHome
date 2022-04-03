@@ -27,17 +27,20 @@ kRequestContentHeaders = {
     'user-agent' : 'GrowTherapy (https://growtherapy.com/)'
 }
 
+kStringObject = {"object_type" : "string"}
+kIntObject = {"object_type" : "int"}
+
 kFormatViewsNode = {
                       "object_type" : "dict",
                       "required_keys" : ["project", "article", "granularity", "timestamp", "access", "agent", "views"],
                       "key_values" : {
-                        "project" : {"object_type" : "string"}, 
-                        "article" : {"object_type" : "string"}, 
-                        "granularity" : {"object_type" : "string"}, 
-                        "timestamp" : {"object_type" : "string"}, 
-                        "access" : {"object_type" : "string"}, 
-                        "agent" : {"object_type" : "string"}, 
-                        "views" : {"object_type" : "int"}
+                        "project" : kStringObject, 
+                        "article" : kStringObject, 
+                        "granularity" : kStringObject, 
+                        "timestamp" : kStringObject, 
+                        "access" : kStringObject, 
+                        "agent" : kStringObject, 
+                        "views" : kIntObject
                       }
                     }
 
@@ -52,48 +55,109 @@ kViewsResponseFormat = {
   }
 }
 
+kArticleObjectFormat = {
+    "object_type" : "dict",
+    "required_keys" : ["article", "views"],
+        "key_values" : {
+            "article" : kStringObject,
+            "views" : kIntObject,
+        }
+}
+
+kArticlesResponseFormat = {
+    "object_type" : "dict",
+    "required_keys" : ["articles"],
+        "key_values" : {
+            "articles" : {
+              "object_type" : "array",
+              "required_values" : [kArticleObjectFormat],
+              "required_keys" : [kArticleObjectFormat]
+            }
+        }
+}
+
+kArticlesItemsResponseFormat = {
+  "object_type" : "dict",
+  "required_keys" : ["items"],
+  "key_values" : {
+     "items" : {
+                "object_type" : "array",
+                "required_values" : [kArticlesResponseFormat],
+                "valid_types" : [kArticlesResponseFormat]
+                }
+  }
+}
+
+kArticlesListResponseFormat = {
+    "object_type" : "array",
+    "required_values" : [kArticlesItemsResponseFormat],
+    "valid_types" : [kArticlesItemsResponseFormat]
+}
+
 def ValidateNode(Node, FormatNode):
     object_type = FormatNode["object_type"]
     if object_type is "string":
-        return isinstance(Node, str)
+        if not isinstance(Node, str):
+            return (False, "Expected string but got %s" % str(Node))
+        return (True, None)
     if object_type is "int":
-        return isinstance(Node, int)
+        if not isinstance(Node, int):
+            return (False, "Expected int but got %s" % str(Node))
+        return (True, None)
     if object_type is "array":
         if not isinstance(Node, list):
-            return False
+            return (False, "Expected array but got %s" % str(Node))
         if "required_values" in FormatNode:
             required_values = FormatNode["required_values"]
+            if not isinstance(required_values, list):
+                return (False, "Incorrect Format: Expected required_values to be a list, but got %s" % str(required_values))
             if len(required_values) > len(Node):
-                return False
+                return (
+                    False, 
+                    "Expected array to have %i values but array only had %i - %s" 
+                    % (len(required_values), len(Node), str(Node))
+                )
             for x in range(0, len(required_values)):
-                if not ValidateNode(Node[x], required_values[x]):
-                    return False
+                resp = ValidateNode(Node[x], required_values[x])
+                if not resp[0]:
+                    return (
+                        False, 
+                        resp[1]
+                    )
         if "valid_types" in FormatNode:
             valid_types = FormatNode["valid_types"]
+            if not isinstance(valid_types, list):
+                return (False, "Incorrect Format: Expected valid_types to be a list, but got %s" % str(valid_types))
             for value in Node:
                 value_valid = False
                 for valid_type in valid_types:
-                    if ValidateNode(value, valid_type):
+                    resp = ValidateNode(value, valid_type)
+                    if resp[0]:
                         value_valid = True
                         break
                 if not value_valid:
-                    return False
-        return True
+                    return (False, "Value %s not a part of any valid types." % str(value))
+        return (True, None)
     if object_type is "dict":
         if not isinstance(Node, dict):
-            return False
+            return (False, "Expected dict but got %s" % str(Node))
         if "required_keys" in FormatNode:
             required_keys = FormatNode["required_keys"]
+            if not isinstance(required_keys, list):
+                return (False, "Incorrect Format: Expected required_keys to be a list, but got %s" % str(required_keys))
             for key in required_keys:
                 if not key in Node:
-                    return False
+                    return (False, "Required key %s missing from dict %s" % (key, str(Node)))
             if "key_values" in FormatNode:
                 key_values = FormatNode["key_values"]
+                if not isinstance(key_values, dict):
+                    return (False, "Incorrect Format: Expected key_values to be a dict, but got %s" % str(dict))
                 for key in Node:
                     if key in key_values:
-                        if not ValidateNode(Node[key], key_values[key]):
-                            return False
-            return True
+                        resp = ValidateNode(Node[key], key_values[key])
+                        if not resp[0]:
+                            return (False, resp[1])
+            return (True, None)
             
 
 def ValidateArgsNonEmpty(ArgKeys, Args):
@@ -211,10 +275,6 @@ def MaxDayFromCountsResponse(ViewCountsResponse):
         '%Y%m%d%M'
     )
 
-class Tester(Resource):
-    def get(self):
-        return [ValidateNode(kNode1, kFormat), ValidateNode(kNode2, kFormat)]
-
 class MainApi1Week(Resource):
     def get(self):
         paramSetup = {
@@ -226,6 +286,9 @@ class MainApi1Week(Resource):
         dateStrings = ComputeDatesListFromStartDate(paramsDict["startDate"], 7)
         queries = map(lambda dateString: "/top/en.wikipedia/all-access/" + dateString, dateStrings)
         responses = CollectResponsesFromQueries(queries)
+        validationResult = ValidateNode(responses, kArticlesListResponseFormat)
+        if not validationResult[0]:
+            return "Failed to parse response: %s" % validationResult[1]
         view_sums = SumViewsFromDateResponses(responses)
         return SortedResponseFromViewSums(view_sums)
 
@@ -243,6 +306,9 @@ class MainApi1Month(Resource):
         dateStrings = ComputeDatesListFromStartDate(startDate, daysNumber)
         queries = map(lambda dateString: "/top/en.wikipedia/all-access/" + dateString, dateStrings)
         responses = CollectResponsesFromQueries(queries)
+        validationResult = ValidateNode(responses, kArticlesListResponseFormat)
+        if not validationResult[0]:
+            return "Failed to parse response: %s" % validationResult[1]
         view_sums = SumViewsFromDateResponses(responses)
         return SortedResponseFromViewSums(view_sums)
 
@@ -263,8 +329,9 @@ class MainApi2Week(Resource):
         )
         if not ValidateResponse(response):
             return kValidationErrorMessage
-        if not ValidateNode(response.json(), kViewsResponseFormat):
-            return kValidationErrorMessage
+        validationResult = ValidateNode(response.json(), kViewsResponseFormat)
+        if not validationResult[0]:
+            return "Failed to parse response: %s" % validationResult[1]
         return SumViewCountsReponse(response.json())
 
 class MainApi2Month(Resource):
@@ -285,8 +352,9 @@ class MainApi2Month(Resource):
         )
         if not ValidateResponse(response):
             return kValidationErrorMessage
-        if not ValidateNode(response.json(), kViewsResponseFormat):
-            return kValidationErrorMessage
+        validationResult = ValidateNode(response.json(), kViewsResponseFormat)
+        if not validationResult[0]:
+            return "Failed to parse response: %s" % validationResult[1]
         return SumViewCountsReponse(response.json())
 
 class MainApi3(Resource):
@@ -307,8 +375,9 @@ class MainApi3(Resource):
         )
         if not ValidateResponse(response):
             return kValidationErrorMessage
-        if not ValidateNode(response.json(), kViewsResponseFormat):
-            return kValidationErrorMessage
+        validationResult = ValidateNode(response.json(), kViewsResponseFormat)
+        if not validationResult[0]:
+            return "Failed to parse response: %s" % validationResult[1]
         return str(MaxDayFromCountsResponse(response.json()))
 
 api.add_resource(MainApi1Week, '/main/api1/week')
@@ -316,7 +385,6 @@ api.add_resource(MainApi1Month, '/main/api1/month')
 api.add_resource(MainApi2Week, '/main/api2/week')
 api.add_resource(MainApi2Month, '/main/api2/month')
 api.add_resource(MainApi3, '/main/api3')
-api.add_resource(Tester, '/main/tester')
 
 if __name__ == '__main__':
     app.run() 
